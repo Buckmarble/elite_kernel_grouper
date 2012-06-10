@@ -28,6 +28,7 @@ HEAD = head.o
 
 AFLAGS_misc.o +=-Wa,-march=armv7-a$(plus_sec)
 MISC = misc.o
+OBJS   += misc.o decompress.o
 
 AFLAGS_decompress.o += -Wa,-march=armv7-a$(plus_sec)
 DECOMPRESS = decompress.o
