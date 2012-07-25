@@ -25,6 +25,7 @@
 
 #include <linux/regulator/machine.h>
 #include <linux/wakelock.h>
+#include <linux/usb/otg.h>
 
 #define SMB_DEBUG			0
 #if SMB_DEBUG
@@ -89,7 +90,7 @@ struct smb347_charger {
 };
 
 int smb347_battery_online(void);
-typedef void (*callback_t)(enum usb_otg_state otg_state, void *args);
+typedef void (*callback_t)(enum usb_otg_state to, enum usb_otg_state from, void *data);
 /*
  * Register callback function for the client.
  * Used by fuel-gauge driver to get battery charging properties.
