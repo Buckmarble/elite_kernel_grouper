@@ -388,19 +388,13 @@ static struct resource grouper_disp2_resources[] = {
 
 static struct tegra_dc_mode grouper_panel_modes[] = {
 {
+/* Panel clock adjustment based on GPU OC MHz */
 #ifdef CONFIG_GPU_OVERCLOCK
-#ifdef CONFIG_GPU_OC_446
-		.pclk = 75000000,
-#endif
-#ifdef CONFIG_GPU_OC_484
-		.pclk = 80000000,
-#endif
-#ifdef CONFIG_GPU_OC_520
-		.pclk = 85000000,
-#endif
+		/* 1280x800@60Hz - use cardhu panel default */
+		.pclk = 74180000,
 #else
-	/* 1280x800@60Hz */
-	.pclk = 74180000,
+		/* 1280x800@60Hz */
+		.pclk = 68000000,
 #endif
 		.h_ref_to_sync = 1,
 		.v_ref_to_sync = 1,
