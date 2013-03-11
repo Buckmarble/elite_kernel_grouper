@@ -546,6 +546,7 @@ static int __init headset_init(void)
 
 	printk(KERN_INFO "%s+ #####\n", __func__);
 	int ret;
+	printk(KERN_INFO "%s+ #####\n", __func__);
 
 	printk("HEADSET: Headset detection init\n");
 
