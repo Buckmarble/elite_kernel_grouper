@@ -454,9 +454,10 @@ static int al3010_late_resume(struct early_suspend *h)
 	printk("al3010_late_resume+\n");
 	int ret=0;
 	//+++
-	//delay 5ms to avoid al3010_early_suspend and al3010_late_resume too close.
-	//if too close , it would cause al3010 chip power on fail
-	mdelay(5);
+	struct al3010_data *data = container_of(h, struct al3010_data, light_sensor_early_suspender);
+    //delay 5ms to avoid al3010_early_suspend and al3010_late_resume too close.
+    //if too close , it would cause al3010 chip power on fail
+    mdelay(5);
 	ret = al3010_chip_resume(data);
 	//---
 	printk("al3010_late_resume-\n");
