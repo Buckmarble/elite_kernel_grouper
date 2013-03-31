@@ -24,6 +24,7 @@
 #define __LINUX_smb347_CHARGER_H
 
 #include <linux/regulator/machine.h>
+#include <linux/usb/otg.h>
 #include <linux/wakelock.h>
 #include <linux/usb/otg.h>
 
