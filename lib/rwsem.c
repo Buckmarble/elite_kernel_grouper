@@ -22,7 +22,7 @@ void __init_rwsem(struct rw_semaphore *sem, const char *name,
 	lockdep_init_map(&sem->dep_map, name, key, 0);
 #endif
 	sem->count = RWSEM_UNLOCKED_VALUE;
-	raw_spin_lock_init(&sem->wait_lock);
+	spin_lock_init(&sem->wait_lock);
 	INIT_LIST_HEAD(&sem->wait_list);
 }
 
@@ -60,10 +60,9 @@ __rwsem_do_wake(struct rw_semaphore *sem, int wake_type)
 	struct rwsem_waiter *waiter;
 	struct task_struct *tsk;
 	struct list_head *next;
-	signed long woken, loop, adjustment;
+	signed long oldcount, woken, loop, adjustment;
 
 	waiter = list_entry(sem->wait_list.next, struct rwsem_waiter, list);
-<<<<<<< HEAD
 	if (!(waiter->flags & RWSEM_WAITING_FOR_WRITE))
 		goto readers_only;
 
@@ -71,19 +70,8 @@ __rwsem_do_wake(struct rw_semaphore *sem, int wake_type)
 		/* Another active reader was observed, so wakeup is not
 		 * likely to succeed. Save the atomic op.
 		 */
-=======
-	if (waiter->type == RWSEM_WAITING_FOR_WRITE) {
-		if (wake_type != RWSEM_WAKE_READ_OWNED)
-			/* Wake writer at the front of the queue, but do not
-			 * grant it the lock yet as we want other writers
-			 * to be able to steal it.  Readers, on the other hand,
-			 * will block as they will notice the queued writer.
-			 */
-			wake_up_process(waiter->task);
->>>>>>> parent of f33f6ee... rwsem: implement support for write lock stealing on the fastpath
 		goto out;
 
-<<<<<<< HEAD
 	/* There's a writer at the front of the queue - try to grant it the
 	 * write lock.  However, we only wake this writer if we can transition
 	 * the active part of the count from 0 -> 1
@@ -125,22 +113,6 @@ __rwsem_do_wake(struct rw_semaphore *sem, int wake_type)
 	 * exclusively since we expect to succeed and run the final rwsem
 	 * count adjustment pretty soon.
 	 */
-=======
-	/* If we come here from up_xxxx(), another thread might have reached
-	 * rwsem_down_failed_common() before we acquired the spinlock and
-	 * woken up a waiter, making it now active.  We prefer to check for
-	 * this first in order to not spend too much time with the spinlock
-	 * held if we're not going to be able to wake up readers in the end.
-	 *
-	 * Note that we do not need to update the rwsem count: any writer
-	 * trying to acquire rwsem will run rwsem_down_write_failed() due
-	 * to the waiting threads and block trying to acquire the spinlock.
-	 *
-	 * We use a dummy atomic update in order to acquire the cache line
-	 * exclusively since we expect to succeed and run the final rwsem
-	 * count adjustment pretty soon.
-	 */
->>>>>>> parent of f33f6ee... rwsem: implement support for write lock stealing on the fastpath
 	if (wake_type == RWSEM_WAKE_ANY &&
 	    rwsem_atomic_update(0, sem) < RWSEM_WAITING_BIAS)
 		/* Someone grabbed the sem for write already */
@@ -163,11 +135,7 @@ __rwsem_do_wake(struct rw_semaphore *sem, int wake_type)
 	} while (waiter->flags & RWSEM_WAITING_FOR_READ);
 
 	adjustment = woken * RWSEM_ACTIVE_READ_BIAS;
-<<<<<<< HEAD
 	if (waiter->flags & RWSEM_WAITING_FOR_READ)
-=======
-	if (waiter->type != RWSEM_WAITING_FOR_WRITE)
->>>>>>> parent of f33f6ee... rwsem: implement support for write lock stealing on the fastpath
 		/* hit end of list above */
 		adjustment -= RWSEM_WAITING_BIAS;
 
@@ -212,7 +180,7 @@ rwsem_down_failed_common(struct rw_semaphore *sem,
 	set_task_state(tsk, TASK_UNINTERRUPTIBLE);
 
 	/* set up my own style of waitqueue */
-	raw_spin_lock_irq(&sem->wait_lock);
+	spin_lock_irq(&sem->wait_lock);
 	waiter.task = tsk;
 	waiter.flags = flags;
 	get_task_struct(tsk);
@@ -224,11 +192,19 @@ rwsem_down_failed_common(struct rw_semaphore *sem,
 	/* we're now waiting on the lock, but no longer actively locking */
 	count = rwsem_atomic_update(adjustment, sem);
 
-	/* If there are no active locks, wake the front queued process(es). */
+	/* If there are no active locks, wake the front queued process(es) up.
+	 *
+	 * Alternatively, if we're called from a failed down_write(), there
+	 * were already threads queued before us and there are no active
+	 * writers, the lock must be read owned; so we try to wake any read
+	 * locks that were queued ahead of us. */
 	if (count == RWSEM_WAITING_BIAS)
 		sem = __rwsem_do_wake(sem, RWSEM_WAKE_NO_ACTIVE);
+	else if (count > RWSEM_WAITING_BIAS &&
+		 adjustment == -RWSEM_ACTIVE_WRITE_BIAS)
+		sem = __rwsem_do_wake(sem, RWSEM_WAKE_READ_OWNED);
 
-	raw_spin_unlock_irq(&sem->wait_lock);
+	spin_unlock_irq(&sem->wait_lock);
 
 	/* wait to be given the lock */
 	for (;;) {
@@ -248,63 +224,9 @@ rwsem_down_failed_common(struct rw_semaphore *sem,
  */
 struct rw_semaphore __sched *rwsem_down_read_failed(struct rw_semaphore *sem)
 {
-<<<<<<< HEAD
 	return rwsem_down_failed_common(sem, RWSEM_WAITING_FOR_READ,
 					-RWSEM_ACTIVE_READ_BIAS);
 }
-=======
-	signed long adjustment = -RWSEM_ACTIVE_WRITE_BIAS;
-	struct rwsem_waiter waiter;
-	struct task_struct *tsk = current;
-	signed long count;
-
-	/* set up my own style of waitqueue */
-	waiter.task = tsk;
-	waiter.type = RWSEM_WAITING_FOR_WRITE;
-
-	raw_spin_lock_irq(&sem->wait_lock);
-	if (list_empty(&sem->wait_list))
-		adjustment += RWSEM_WAITING_BIAS;
-	list_add_tail(&waiter.list, &sem->wait_list);
-
-	/* we're now waiting on the lock, but no longer actively locking */
-	count = rwsem_atomic_update(adjustment, sem);
-
-	/* If there were already threads queued before us and there are no
-	 * active writers, the lock must be read owned; so we try to wake
-	 * any read locks that were queued ahead of us. */
-	if (count > RWSEM_WAITING_BIAS &&
-	    adjustment == -RWSEM_ACTIVE_WRITE_BIAS)
-		sem = __rwsem_do_wake(sem, RWSEM_WAKE_READ_OWNED);
-
-	/* wait until we successfully acquire the lock */
-	set_task_state(tsk, TASK_UNINTERRUPTIBLE);
-	while (true) {
-		if (!(count & RWSEM_ACTIVE_MASK)) {
-			/* Try acquiring the write lock. */
-			count = RWSEM_ACTIVE_WRITE_BIAS;
-			if (!list_is_singular(&sem->wait_list))
-				count += RWSEM_WAITING_BIAS;
-			if (cmpxchg(&sem->count, RWSEM_WAITING_BIAS, count) ==
-							RWSEM_WAITING_BIAS)
-				break;
-		}
-
-		raw_spin_unlock_irq(&sem->wait_lock);
-
-		/* Block until there are no active lockers. */
-		do {
-			schedule();
-			set_task_state(tsk, TASK_UNINTERRUPTIBLE);
-		} while ((count = sem->count) & RWSEM_ACTIVE_MASK);
-
-		raw_spin_lock_irq(&sem->wait_lock);
-	}
-
-	list_del(&waiter.list);
-	raw_spin_unlock_irq(&sem->wait_lock);
-	tsk->state = TASK_RUNNING;
->>>>>>> parent of f33f6ee... rwsem: implement support for write lock stealing on the fastpath
 
 /*
  * wait for the write lock to be granted
@@ -323,13 +245,13 @@ struct rw_semaphore *rwsem_wake(struct rw_semaphore *sem)
 {
 	unsigned long flags;
 
-	raw_spin_lock_irqsave(&sem->wait_lock, flags);
+	spin_lock_irqsave(&sem->wait_lock, flags);
 
 	/* do nothing if list empty */
 	if (!list_empty(&sem->wait_list))
 		sem = __rwsem_do_wake(sem, RWSEM_WAKE_ANY);
 
-	raw_spin_unlock_irqrestore(&sem->wait_lock, flags);
+	spin_unlock_irqrestore(&sem->wait_lock, flags);
 
 	return sem;
 }
@@ -343,13 +265,13 @@ struct rw_semaphore *rwsem_downgrade_wake(struct rw_semaphore *sem)
 {
 	unsigned long flags;
 
-	raw_spin_lock_irqsave(&sem->wait_lock, flags);
+	spin_lock_irqsave(&sem->wait_lock, flags);
 
 	/* do nothing if list empty */
 	if (!list_empty(&sem->wait_list))
 		sem = __rwsem_do_wake(sem, RWSEM_WAKE_READ_OWNED);
 
-	raw_spin_unlock_irqrestore(&sem->wait_lock, flags);
+	spin_unlock_irqrestore(&sem->wait_lock, flags);
 
 	return sem;
 }
