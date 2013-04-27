@@ -41,7 +41,7 @@
 #define INITIAL_STATE		TEGRA_HP_DISABLED
 #define UP2G0_DELAY_MS		70
 #define UP2Gn_DELAY_MS		100
-#define DOWN_DELAY_MS		1000
+#define DOWN_DELAY_MS		2000
 
 static struct mutex *tegra3_cpu_lock;
 
@@ -66,7 +66,7 @@ module_param(idle_bottom_freq, uint, 0644);
 static int mp_overhead = 10;
 module_param(mp_overhead, int, 0644);
 
-static int balance_level = 70;
+static int balance_level = 75;
 module_param(balance_level, int, 0644);
 
 static struct clk *cpu_clk;
@@ -147,12 +147,9 @@ static int hp_state_set(const char *arg, const struct kernel_param *kp)
 
 	if (ret == 0) {
 		if ((hp_state == TEGRA_HP_DISABLED) &&
-				(old_state != TEGRA_HP_DISABLED)) {
-					mutex_unlock(tegra3_cpu_lock);
-					cancel_delayed_work_sync(&hotplug_work);
-					mutex_lock(tegra3_cpu_lock);
-					pr_info("Tegra auto-hotplug disabled\n");
-		} else if (hp_state != TEGRA_HP_DISABLED) {
+		    (old_state != TEGRA_HP_DISABLED))
+			pr_info("Tegra auto-hotplug disabled\n");
+		else if (hp_state != TEGRA_HP_DISABLED) {
 			if (old_state == TEGRA_HP_DISABLED) {
 				pr_info("Tegra auto-hotplug enabled\n");
 				hp_init_stats();
@@ -294,13 +291,13 @@ static void tegra_auto_hotplug_work_func(struct work_struct *work)
 
 	if (cpu < nr_cpu_ids) {
 		if (up){
-			pr_debug("cpu_up(%u)+\n",cpu);
+			printk("cpu_up(%u)+\n",cpu);
 			cpu_up(cpu);
-			pr_debug("cpu_up(%u)-\n",cpu);
+			printk("cpu_up(%u)-\n",cpu);
 		}else{
-			pr_debug("cpu_down(%u)+\n",cpu);
+			printk("cpu_down(%u)+\n",cpu);
 			cpu_down(cpu);
-			pr_debug("cpu_down(%u)-\n",cpu);
+			printk("cpu_down(%u)-\n",cpu);
 		}
 	}
 }
