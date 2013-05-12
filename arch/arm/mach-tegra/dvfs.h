@@ -24,8 +24,6 @@
 #define MAX_DVFS_FREQS	18
 #define DVFS_RAIL_STATS_TOP_BIN	40
 
-#include "clock.h"
-
 struct clk;
 struct dvfs_rail;
 
@@ -91,7 +89,7 @@ struct dvfs {
 	int freqs_mult;
 	unsigned long freqs[MAX_DVFS_FREQS];
 	unsigned long alt_freqs[MAX_DVFS_FREQS];
-	unsigned int *millivolts;
+	const int *millivolts;
 	struct dvfs_rail *dvfs_rail;
 	bool auto_dvfs;
 	enum dvfs_alt_freqs alt_freqs_state;
