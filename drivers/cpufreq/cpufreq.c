@@ -596,158 +596,6 @@ static ssize_t show_bios_limit(struct cpufreq_policy *policy, char *buf)
 	return sprintf(buf, "%u\n", policy->cpuinfo.max_freq);
 }
 
-#ifdef CONFIG_VOLTAGE_CONTROL
-/*
- * Tegra3 voltage control via cpufreq by Paul Reioux (faux123)
- * inspired by Michael Huang's voltage control code for OMAP44xx
- */
-
-#include "../../arch/arm/mach-tegra/dvfs.h"
-#include "../../arch/arm/mach-tegra/clock.h"
-
-extern int user_mv_table[MAX_DVFS_FREQS];
-
-static ssize_t show_UV_mV_table(struct cpufreq_policy *policy, char *buf)
-{
-	int i = 0;
-	char *out = buf;
-	struct clk *cpu_clk_g = tegra_get_clock_by_name("cpu_g");
-
-	/* find how many actual entries there are */
-		i = cpu_clk_g->dvfs->num_freqs;
-
-	for(i--; i >=0; i--) {
-		out += sprintf(out, "%lumhz: %i mV\n",
-				cpu_clk_g->dvfs->freqs[i]/1000000,
-				cpu_clk_g->dvfs->millivolts[i]);
-	}
-
-	return out - buf;
-}
-
-static ssize_t store_UV_mV_table(struct cpufreq_policy *policy, char *buf, size_t count)
-{
-	int i = 0;
-	unsigned long volt_cur;
-	int ret;
-	char size_cur[16];
-
-	struct clk *cpu_clk_g = tegra_get_clock_by_name("cpu_g");
-
-	/* find how many actual entries there are */
-	i = cpu_clk_g->dvfs->num_freqs;
-
-	for(i--; i >= 0; i--) {
-
-		if(cpu_clk_g->dvfs->freqs[i]/1000000 != 0) {
-			ret = sscanf(buf, "%lu", &volt_cur);
-			if (ret != 1)
-				return -EINVAL;
-
-			/* TODO: need some robustness checks */
-			user_mv_table[i] = volt_cur;
-			pr_info("user mv tbl[%i]: %lu\n", i, volt_cur);
-
-			/* Non-standard sysfs interface: advance buf */
-			ret = sscanf(buf, "%s", size_cur);
-			buf += (strlen(size_cur)+1);
-		}
-	}
-	/* update dvfs table here */
-	cpu_clk_g->dvfs->millivolts = user_mv_table;
-
-	return count;
-}
-#endif
-#ifdef CONFIG_GPU_OVERCLOCK
-static ssize_t show_gpu_oc(struct cpufreq_policy *policy, char *buf)
-{
-	char *c = buf;
-	struct clk *gpu = tegra_get_clock_by_name("3d");
-	unsigned int i = gpu->dvfs->num_freqs;
-	unsigned long gpu_freq = 0;
-
-	if (i <= 0)
-		gpu_freq = -1;
-
-	if (i >= 1)
-		gpu_freq = gpu->dvfs->freqs[gpu->dvfs->num_freqs-1]/1000000;
-
-	return sprintf(c, "%lu\n", gpu_freq);
-}
-
-static ssize_t store_gpu_oc(struct cpufreq_policy *policy, const char *buf, size_t count)
-{
-	int ret;
-	unsigned long gpu_freq = 0;
-	unsigned int i = 0;
-	unsigned long new_gpu_freq = 0;
-	unsigned int new_volt = 0;
-
-	//all the tables that need to be updated with the new frequencies
-	struct clk *vde = tegra_get_clock_by_name("vde");
-	struct clk *mpe = tegra_get_clock_by_name("mpe");
-	struct clk *two_d = tegra_get_clock_by_name("2d");
-	struct clk *epp = tegra_get_clock_by_name("epp");
-	struct clk *three_d = tegra_get_clock_by_name("3d");
-	struct clk *three_d2 = tegra_get_clock_by_name("3d2");
-	struct clk *se = tegra_get_clock_by_name("se");
-	struct clk *cbus = tegra_get_clock_by_name("cbus");
-	struct clk *host1x = tegra_get_clock_by_name("host1x");
-	struct clk *pll_c = tegra_get_clock_by_name("pll_c");
-
-	unsigned int array_size = three_d->dvfs->num_freqs;
-	char cur_size[array_size];
-
-	i = array_size;
-	if (i <= 0) 
-		return -EINVAL;
-
-	ret = sscanf(buf, "%lu", &gpu_freq);
-	if (ret == 0)
-		return -EINVAL;
-
-	if (gpu_freq > 520 || gpu_freq < 416) {
-		pr_info("GPU clock range is 416-520 MHz. Tried to set %lu\n",gpu_freq);
-		return -EINVAL;
-	}
-
-	new_gpu_freq = gpu_freq * 1000000;
-
-	rcu_read_lock();
-
-	vde->max_rate = new_gpu_freq;
-	mpe->max_rate = new_gpu_freq;
-	two_d->max_rate = new_gpu_freq;
-	epp->max_rate = new_gpu_freq;
-	three_d->max_rate = new_gpu_freq;
-	three_d2->max_rate = new_gpu_freq;
-	se->max_rate = new_gpu_freq;
-	cbus->max_rate = new_gpu_freq;
-	
-	for (i--; i >= 5; i--) {
-		vde->dvfs->freqs[i] = new_gpu_freq;
-		mpe->dvfs->freqs[i] = new_gpu_freq;
-		two_d->dvfs->freqs[i] = new_gpu_freq;
-		epp->dvfs->freqs[i] = new_gpu_freq;
-		three_d->dvfs->freqs[i] = new_gpu_freq;
-		three_d2->dvfs->freqs[i] = new_gpu_freq;
-		se->dvfs->freqs[i] = new_gpu_freq;
-		cbus->dvfs->freqs[i] = new_gpu_freq;
-	}
-
-	ret = sscanf(buf, "%s", cur_size);
-
-	if (ret == 0)
-		return -EINVAL;
-
-	buf += (strlen(cur_size) + 1);
-	
-	rcu_read_unlock();
-
-	return count;
-}
-#endif
 cpufreq_freq_attr_ro_perm(cpuinfo_cur_freq, 0400);
 cpufreq_freq_attr_ro(cpuinfo_min_freq);
 cpufreq_freq_attr_ro(cpuinfo_max_freq);
@@ -765,12 +613,6 @@ cpufreq_freq_attr_rw(scaling_setspeed);
 cpufreq_freq_attr_rw(dvfs_test);
 cpufreq_freq_attr_ro(policy_min_freq);
 cpufreq_freq_attr_ro(policy_max_freq);
-#ifdef CONFIG_VOLTAGE_CONTROL
-cpufreq_freq_attr_rw(UV_mV_table);
-#endif
-#ifdef CONFIG_GPU_OVERCLOCK
-cpufreq_freq_attr_rw(gpu_oc);
-#endif
 
 static struct attribute *default_attrs[] = {
 	&cpuinfo_min_freq.attr,
@@ -787,13 +629,6 @@ static struct attribute *default_attrs[] = {
 	&dvfs_test.attr,
 	&policy_min_freq.attr,
 	&policy_max_freq.attr,
-#ifdef CONFIG_VOLTAGE_CONTROL
-	&UV_mV_table.attr,
-#endif
-#ifdef CONFIG_GPU_OVERCLOCK
-	&gpu_oc.attr,
-#endif
-
 	NULL
 };
 
@@ -1140,6 +975,9 @@ static int cpufreq_add_dev(struct sys_device *sys_dev)
 		pr_debug("initialization failed\n");
 		goto err_unlock_policy;
 	}
+
+        if (policy->max > 1300000) policy->max = 1300000;
+
 	policy->user_policy.min = policy->min;
 	policy->user_policy.max = policy->max;
 

@@ -271,40 +271,6 @@ config TEGRA_EMC_SCALING_ENABLE
 	depends on TEGRA_SILICON_PLATFORM
 	default n
 
-config VOLTAGE_CONTROL
-	bool "Enable user voltage control on Tegra CPU"
-	depends on TEGRA_SILICON_PLATFORM
-	default n
-	help
-	User custom voltage control interface
-
-config GPU_OVERCLOCK
-	bool "Enable GPU overclock for Tegra3"
-	depends on TEGRA_SILICON_PLATFORM
-	default n
-	help
-	Choose y to overclock the GPU. 
-	If Off, clock speed is 416MHz.
-	If On, default GPU clock speed can be selected and then adjusted at runtime.
-
-choice
-
-	depends on GPU_OVERCLOCK
-	prompt "Maximum GPU Rate"
-	default GPU_OC_446
-	---help---
-	  Select the desired GPU overclock rate.
-
-	  If not sure, leave the defaults.
-	config GPU_OC_446
-		bool "446 MHz"
-	config GPU_OC_484
-		bool "484 MHz"
-	config GPU_OC_520
-		bool "520 MHz"
-
-endchoice
-	  
 config TEGRA_CPU_DVFS
 	bool "Enable voltage scaling on Tegra CPU"
 	depends on TEGRA_SILICON_PLATFORM

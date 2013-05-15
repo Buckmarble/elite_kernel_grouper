@@ -615,7 +615,7 @@ static int wait_for_IRQ_Low(struct i2c_client *client, int utime){
 	      return 0; 
     }while(retry_times-- > 0);
 	
-    touch_debug(NO_DEBUG, "Wait IRQ time out\n");
+    touch_debug("Wait IRQ time out\n");
     return -1;
 }
 
@@ -856,8 +856,7 @@ static int elan_ktf3k_ts_get_power_source(struct i2c_client *client)
 	return 0;
 }
 
-static void update_power_source(void)
-{
+static void update_power_source(){
       unsigned power_source = now_usb_cable_status;
       if(private_ts == NULL || work_lock) return;
 	// Send power state 1 if USB cable and AC charger was plugged on. 
@@ -1234,11 +1233,11 @@ static int sendI2CPacket(struct i2c_client *client, const unsigned char *buf, un
 		    ret = 0;
 	      }  
 	     if(ret < (length < SIZE_PER_PACKET ? length : SIZE_PER_PACKET)){
-	          touch_debug(NO_DEBUG, "Sending packet broken\n");
+	          touch_debug("Sending packet broken\n");
 	     } 
 		 	
 	     if(retry_times < 0){
-	          touch_debug(NO_DEBUG, "Failed sending I2C touch firmware packet.\n");
+	          touch_debug("Failed sending I2C touch firmware packet.\n");
 	          break;
 	     }
      }
@@ -1256,7 +1255,7 @@ static int recvI2CPacket(struct i2c_client *client, unsigned char *buf, unsigned
 	      }  
 				
 	     if(retry_times < 0){
-	          touch_debug(NO_DEBUG, "Failed sending I2C touch firmware packet.\n");
+	          touch_debug("Failed sending I2C touch firmware packet.\n");
 	          break;
 	     }
      }
@@ -1274,8 +1273,6 @@ static int firmware_update_header(struct i2c_client *client, const unsigned char
     unsigned char *cursor; 
     int boot_code = 0;
     struct elan_ktf3k_ts_data *ts = i2c_get_clientdata(client);
-    int sendCount;
-    int recvCount;
 	
     if(ts == NULL) 
         return -1;
@@ -1317,12 +1314,14 @@ static int firmware_update_header(struct i2c_client *client, const unsigned char
 page_write_retry:
 	  touch_debug(DEBUG_MESSAGES, "Update page number %d\n", i);
 
+          int sendCount;
           if((sendCount = sendI2CPacket(client, cursor, FIRMWARE_PAGE_SIZE)) != FIRMWARE_PAGE_SIZE){
 	      dev_err(&client->dev, "Fail to Update page number %d\n", i);
 		goto fw_update_failed;
 	  }
           touch_debug(DEBUG_INFO, "sendI2CPacket send %d bytes\n", sendCount);
 
+          int recvCount;
           if((recvCount = recvI2CPacket(client, packet_data, FIRMWARE_ACK_SIZE)) != FIRMWARE_ACK_SIZE){
 	      dev_err(&client->dev, "Fail to Update page number %d\n", i);
 	      goto fw_update_failed;
@@ -1398,11 +1397,11 @@ int elan_stress_release(struct inode *inode, struct file *filp)
 	return 0;          /* success */
 }
 
-long elan_stress_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
+int elan_stress_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 {
 	int err = 1;
 
-	printk("%s cmd: %u\n", __func__, cmd);
+	printk("%s\n", __func__, cmd);
 	if (_IOC_TYPE(cmd) != STRESS_IOC_MAGIC)
 	return -ENOTTY;
 	if (_IOC_NR(cmd) > STRESS_IOC_MAXNR)
@@ -1440,7 +1439,7 @@ long elan_stress_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 
 static struct file_operations stress_fops = {
 		.owner =    THIS_MODULE,
-		.unlocked_ioctl = elan_stress_ioctl,
+		.unlocked_ioctl =	elan_stress_ioctl,
 		.open =		elan_stress_open,
 		.release =	elan_stress_release,
 		};

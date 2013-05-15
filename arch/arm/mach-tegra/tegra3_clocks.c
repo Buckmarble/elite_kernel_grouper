@@ -839,9 +839,7 @@ static int tegra3_cpu_clk_set_rate(struct clk *c, unsigned long rate)
 			return -ENOSYS;
 		else if ((!c->dvfs->dvfs_rail->reg) &&
 			  (clk_get_rate_locked(c) < rate)) {
-			pr_debug("Increasing CPU rate while regulator is not"
-				" ready may overclock CPU\n");
-			return -ENOSYS;
+			pr_info("[imoseyon] bypassing cpu regulator warning.\n");
 		}
 	}
 
@@ -4553,11 +4551,11 @@ static struct cpufreq_frequency_table freq_table_1p0GHz[] = {
 	{ 0,  51000 },
 	{ 1, 102000 },
 	{ 2, 204000 },
-	{ 3, 340000 },
-	{ 4, 475000 },
-	{ 5, 640000 },
+	{ 3, 312000 },
+	{ 4, 456000 },
+	{ 5, 608000 },
 	{ 6, 760000 },
-	{ 7, 860000 },
+	{ 7, 816000 },
 	{ 8, 912000 },
 	{ 9, 1000000 },
 	{10, CPUFREQ_TABLE_END },
@@ -4585,7 +4583,7 @@ static struct cpufreq_frequency_table freq_table_1p4GHz[] = {
 	{ 2,  204000 },
 	{ 3,  370000 },
 	{ 4,  475000 },
-	{ 5,  640000 },
+	{ 5,  620000 },
 	{ 6,  760000 },
 	{ 7,  860000 },
 	{ 8, 1000000 },
@@ -4614,34 +4612,16 @@ static struct cpufreq_frequency_table freq_table_1p5GHz[] = {
 	{14, CPUFREQ_TABLE_END },
 };
 
-static struct cpufreq_frequency_table freq_table_1p6GHz[] = {
-	{ 0,   51000 },
-	{ 1,  102000 },
-	{ 2,  204000 },
-	{ 3,  340000 },
-	{ 4,  475000 },
-	{ 5,  640000 },
-	{ 6,  860000 },
-	{ 7, 1000000 },
-	{ 8, 1100000 },
-	{ 9, 1200000 },
-	{10, 1300000 },
-	{11, 1400000 },
-	{12, 1500000 },
-	{13, 1600000 },
-	{14, CPUFREQ_TABLE_END },
-};
-
 static struct cpufreq_frequency_table freq_table_1p7GHz[] = {
 	{ 0,   51000 },
 	{ 1,  102000 },
 	{ 2,  204000 },
-	{ 3,  340000 },
+	{ 3,  370000 },
 	{ 4,  475000 },
-	{ 5,  640000 },
-	{ 6,  860000 },
-	{ 7, 1000000 },
-	{ 8, 1200000 },
+	{ 5,  620000 },
+	{ 6,  760000 },
+	{ 7,  910000 },
+	{ 8, 1150000 },
 	{ 9, 1300000 },
 	{10, 1400000 },
 	{11, 1500000 },
@@ -4656,7 +4636,6 @@ static struct tegra_cpufreq_table_data cpufreq_tables[] = {
 	{ freq_table_1p3GHz, 2, 10 },
 	{ freq_table_1p4GHz, 2, 11 },
 	{ freq_table_1p5GHz, 2, 12 },
-	{ freq_table_1p6GHz, 2, 13 },
 	{ freq_table_1p7GHz, 2, 12 },
 };
 
@@ -4725,7 +4704,6 @@ struct tegra_cpufreq_table_data *tegra_cpufreq_table_get(void)
 				ret = clip_cpu_rate_limits(
 					&cpufreq_tables[i],
 					&policy, cpu_clk_g, cpu_clk_lp);
-				printk("tegra3_clocks: clip_cpu_rate_limits return code: %u\n", ret);
 				if (!ret)
 					return &cpufreq_tables[i];
 			}
